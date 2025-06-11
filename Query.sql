@@ -77,5 +77,57 @@ ORDER BY milliseconds DESC;
 
 /* ======================================== 3 - Advance ======================================== */
 
+/* Q1: Find how much amount spent by each customer on top earned artists? Write a query to return customer name, artist name and total spent */
+WITH top_earned_artist AS (
+	SELECT art.artist_id, art.name, SUM(inv_l.unit_price * inv_l.quantity)
+	FROM artist art
+	JOIN album a ON art.artist_id = a.artist_id
+	JOIN track t ON a.album_id = t.album_id
+	JOIN invoice_line inv_l ON t.track_id = inv_l.track_id
+	GROUP BY 1
+	ORDER BY 3 DESC
+	LIMIT 1
+)
+SELECT c.first_name, c.last_name, art.name, SUM(inv_l.unit_price * inv_l.quantity)
+FROM customer c
+JOIN invoice inv ON c.customer_id = inv.customer_id
+JOIN invoice_line inv_l ON inv.invoice_id = inv_l.invoice_id
+JOIN track t ON inv_l.track_id = t.track_id
+JOIN album a ON t.album_id = a.album_id
+JOIN artist art ON a.artist_id = art.artist_id
+JOIN top_earned_artist tea ON a.artist_id = tea.artist_id
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
 
+/* Q2: We want to find out the most popular music Genre for each country. We determine the most popular genre as the genre 
+with the highest amount of purchases. Write a query that returns each country along with the top Genre. For countries where 
+the maximum number of purchases is shared return all Genres. */
+WITH popular_genre AS(
+	SELECT SUM(inv_l.quantity) AS purchases, c.country, g.name,
+	ROW_NUMBER() OVER(PARTITION BY c.country ORDER BY SUM(inv_l.quantity) DESC) AS RowNo
+	FROM genre g
+	JOIN track t ON g.genre_id = t.genre_id
+	JOIN invoice_line inv_l ON t.track_id = inv_l.track_id
+	JOIN invoice inv ON inv_l.invoice_id = inv.invoice_id
+	JOIN customer c ON inv.customer_id = c.customer_id
+	GROUP BY c.country, g.name
+	ORDER BY 2 ASC
+)
+SELECT * 
+FROM popular_genre
+WHERE RowNo = 1
 
+/* Q3: Write a query that determines the customer that has spent the most on music for each country. 
+Write a query that returns the country along with the top customer and how much they spent. 
+For countries where the top amount spent is shared, provide all customers who spent this amount. */
+WITH top_country_wise_customer AS (
+	SELECT c.first_name, c.last_name, c.country, SUM(total) AS total_spend, 
+	ROW_NUMBER() OVER(PARTITION BY c.country ORDER BY SUM(total) DESC) AS RowNo
+	FROM customer c
+	JOIN invoice inv ON c.customer_id = inv.customer_id
+	GROUP BY 1, 2, 3
+	ORDER BY 3 ASC, 4 DESC
+)
+SELECT * 
+FROM top_country_wise_customer 
+WHERE RowNo = 1; 
